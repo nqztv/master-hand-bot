@@ -30,13 +30,14 @@ class Schedule(commands.Cog):
     async def on_ready(self):
         print('Scheduled Messages ready')
 
-    @tasks.loop(seconds=10.0)
+    @tasks.loop(seconds=30.0)
     async def printer(self):
         messages = scheduled_messages_sheet.get_all_values()
         #messages[1][2] = "OVERWRITE"
         status_index = messages[0].index("Status")
         time_index = messages[0].index("Time (Eastern)")
         channel_index = messages[0].index("Channel")
+        message_index = messages[0].index("Message")
         embed_color_index = messages[0].index("Embed Color")
         embed_title_index = messages[0].index("Embed Title")
         embed_description_index = messages[0].index("Embed Description")
@@ -48,8 +49,16 @@ class Schedule(commands.Cog):
             if message[status_index] == "Executed":
                 continue
 
-            parsed_time = datetime.strptime(message[time_index], '%I:%M %p')
-            current_time = datetime.now(pytz.timezone("America/New_York")).time()
+            if message[time_index] == "" or str(message[embed_color_index])[:2] != "0x":
+                message[status_index] = "Invalid"
+                continue
+
+            try:
+                parsed_time = datetime.strptime(message[time_index], '%I:%M %p')
+                current_time = datetime.now(pytz.timezone("America/New_York")).time()
+            except ValueError:
+                message[status_index] = "Invalid Time"
+                continue
             
             message[status_index] = "Valid"
 
@@ -77,9 +86,16 @@ class Schedule(commands.Cog):
                     embed_var.set_thumbnail(url=message[embed_thumbnail_index])
 
                 channel = self.bot.get_channel(int(message[channel_index]))
-                await channel.send(embed=embed_var)
 
-        scheduled_messages_sheet.update(messages)
+                if (message[embed_title_index] != ""):
+                    await channel.send(embed=embed_var)
+                elif (message[message_index] != ""):
+                    await channel.send(message[message_index])
+        
+        try:
+            scheduled_messages_sheet.update(messages)
+        except:
+            print("APIError")
 
 def setup(bot):
     bot.add_cog(Schedule(bot))

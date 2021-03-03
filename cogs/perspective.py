@@ -25,7 +25,7 @@ load_dotenv()
 gc = gspread.service_account(filename='credentials.json')
 
 # Open a sheet from a spreadsheet in one go
-message_check_sheet = gc.open("Message Check").sheet1
+message_check_sheet = gc.open("Message Check").get_worksheet(0)
 
 # set perspective api stuff
 api_key = str(os.getenv('PERSPECTIVE_API_KEY'))
@@ -70,6 +70,10 @@ class Perspective(commands.Cog):
     
         message = message_queue.get()
 
+        if str(message[1]) == "":
+            message_queue.task_done()
+            return
+
         current_time = time.strftime("%H:%M:%S", time.localtime())
 
         #logging.info(f'{current_time}: Working on the message "{message[1]}"')
@@ -94,23 +98,28 @@ class Perspective(commands.Cog):
         response = requests.post(url = url, data = json.dumps(data_dict)) 
         response_dict = json.loads(response.content) 
 
-        perspective_results = [
-            response_dict["attributeScores"]["TOXICITY"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["IDENTITY_ATTACK"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["INSULT"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["PROFANITY"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["THREAT"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["SEXUALLY_EXPLICIT"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["FLIRTATION"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["INFLAMMATORY"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["SPAM"]["summaryScore"]["value"],
-            response_dict["attributeScores"]["UNSUBSTANTIAL"]["summaryScore"]["value"]
-        ]
+        try:
+            perspective_results = [
+                response_dict["attributeScores"]["TOXICITY"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["IDENTITY_ATTACK"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["INSULT"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["PROFANITY"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["THREAT"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["SEXUALLY_EXPLICIT"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["FLIRTATION"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["INFLAMMATORY"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["SPAM"]["summaryScore"]["value"],
+                response_dict["attributeScores"]["UNSUBSTANTIAL"]["summaryScore"]["value"]
+            ]
 
-        message.extend(perspective_results)
+            message.extend(perspective_results)
+
+        except KeyError:
+            message.extend(["Error. Check Logs."])
+            print(response.content)
 
         message_check_sheet.append_row(message)
-
+        
         message_queue.task_done()
 
         #logging.info(str(message))
